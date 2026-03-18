@@ -21,6 +21,8 @@ class ChampionCounters:
     wins_enemy: int = 0
     losses_enemy: int = 0
     banned_any: int = 0
+    banned_when_held: int = 0
+    banned_when_not_held: int = 0
 
 
 @dataclass
@@ -92,7 +94,16 @@ def _select_recent_window(matches: List[MatchRow], max_matches: int) -> List[Mat
     if max_matches <= 0:
         return []
 
-    return matches[-max_matches:]
+    sorted_matches = sorted(matches, key=lambda m: _game_id_sort_key(m.game_id), reverse=True)
+    return sorted_matches[:max_matches]
+
+
+def _game_id_sort_key(game_id: str):
+    game_id_str = str(game_id).strip()
+    try:
+        return int(game_id_str)
+    except ValueError:
+        return game_id_str
 
 
 def _filter_matches_by_champion(
@@ -109,6 +120,7 @@ def _compute_ban_priority_rows(
     ban_reference = list(ban_matches)
     total_matches = len(selected)
     ban_reference_matches = len(ban_reference)
+    not_held_matches = max(ban_reference_matches - total_matches, 0)
 
     if total_matches == 0:
         return []
@@ -134,10 +146,16 @@ def _compute_ban_priority_rows(
             else:
                 counters[champ].losses_enemy += 1
 
+    selected_game_ids = {match.game_id for match in selected}
+
     for match in ban_reference:
         unique_bans = _other_9_unique_bans(match)
         for banned_champ in unique_bans:
             counters[banned_champ].banned_any += 1
+            if match.game_id in selected_game_ids:
+                counters[banned_champ].banned_when_held += 1
+            else:
+                counters[banned_champ].banned_when_not_held += 1
 
     baseline = total_wins / total_matches
 
@@ -156,6 +174,11 @@ def _compute_ban_priority_rows(
         # so estimate with probability that champ is banned by any ban slot in the
         # recent-match window (ban behavior does not depend on chosen champion).
         b_minus_you = c.banned_any / ban_reference_matches if ban_reference_matches else 0.0
+        b_minus_you_when_held = c.banned_when_held / total_matches if total_matches else 0.0
+        b_minus_you_when_not_held = (
+            c.banned_when_not_held / not_held_matches if not_held_matches else 0.0
+        )
+        ban_behavior_lift_vs_not_held = b_minus_you_when_held - b_minus_you_when_not_held
         ban_priority = threat * (1.0 - b_minus_you)
 
         rows.append(
@@ -173,6 +196,9 @@ def _compute_ban_priority_rows(
                 "wA": wA,
                 "threat": threat,
                 "b_minus_you": b_minus_you,
+                "b_minus_you_when_held": b_minus_you_when_held,
+                "b_minus_you_when_not_held": b_minus_you_when_not_held,
+                "ban_behavior_lift_vs_not_held": ban_behavior_lift_vs_not_held,
                 "ban_priority": ban_priority,
             }
         )
@@ -220,6 +246,9 @@ def _write_output(rows: List[Dict[str, float]], output_file: Path) -> None:
         "wA",
         "threat",
         "b_minus_you",
+        "b_minus_you_when_held",
+        "b_minus_you_when_not_held",
+        "ban_behavior_lift_vs_not_held",
         "ban_priority",
     ]
 
