@@ -131,8 +131,14 @@ def print_csv():
 
     print(f"[2/3] Building {NEW_OUTPUT_FILE} from {file_count} match file(s)...")
 
+    row_order = sorted(
+        range(file_count),
+        key=lambda row: _game_id_sort_key(match_meta[row * 5 + 1]),
+        reverse=True,
+    )
+
     with open(NEW_OUTPUT_FILE, "w") as csv_file:
-        for row in range(file_count):
+        for row in row_order:
             meta_start = row * 5
             champs_start = row * 10
             bans_start = row * 10
@@ -153,6 +159,14 @@ def print_csv():
     if os.path.exists(OUTPUT_FILE):
         os.remove(OUTPUT_FILE)
     os.rename(NEW_OUTPUT_FILE, OUTPUT_FILE)
+
+
+def _game_id_sort_key(game_id):
+    game_id_str = str(game_id).strip()
+    try:
+        return int(game_id_str)
+    except ValueError:
+        return game_id_str
 
 
 def _load_existing_player_bans():
