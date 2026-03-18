@@ -14,6 +14,8 @@ from api_config import (
 )
 
 _CHAMPION_ID_TO_NAME = None
+OUTPUT_FILE = "Output.csv"
+NEW_OUTPUT_FILE = "NewOutput.csv"
 
 
 def _request_json(url):
@@ -116,6 +118,7 @@ def print_csv():
     champions = []
     match_meta = []
     bans = []
+    existing_player_bans = _load_existing_player_bans()
 
     for entry in os.listdir():
         if not entry.endswith(".json"):
@@ -126,13 +129,20 @@ def print_csv():
             data = json.load(json_file)
             _append_match_data(data, match_meta, champions, bans)
 
-    print(f"[2/3] Building Output.csv from {file_count} match file(s)...")
+    print(f"[2/3] Building {NEW_OUTPUT_FILE} from {file_count} match file(s)...")
 
-    with open("Output.csv", "w") as csv_file:
-        for row in range(file_count):
+    row_order = sorted(
+        range(file_count),
+        key=lambda row: _game_id_sort_key(match_meta[row * 5 + 1]),
+        reverse=True,
+    )
+
+    with open(NEW_OUTPUT_FILE, "w") as csv_file:
+        for row in row_order:
             meta_start = row * 5
             champs_start = row * 10
             bans_start = row * 10
+            game_id = str(match_meta[meta_start + 1])
 
             for i in range(meta_start, meta_start + 5):
                 csv_file.write(f"{match_meta[i]},")
@@ -143,7 +153,42 @@ def print_csv():
             for i in range(bans_start, bans_start + 10):
                 csv_file.write(f"{bans[i]},")
 
-            csv_file.write("\n")
+            preserved_player_ban = existing_player_bans.get(game_id, "")
+            csv_file.write(f"{preserved_player_ban}\n")
+
+    if os.path.exists(OUTPUT_FILE):
+        os.remove(OUTPUT_FILE)
+    os.rename(NEW_OUTPUT_FILE, OUTPUT_FILE)
+
+
+def _game_id_sort_key(game_id):
+    game_id_str = str(game_id).strip()
+    try:
+        return int(game_id_str)
+    except ValueError:
+        return game_id_str
+
+
+def _load_existing_player_bans():
+    if not os.path.exists(OUTPUT_FILE):
+        return {}
+
+    player_bans_by_game_id = {}
+    with open(OUTPUT_FILE, "r") as csv_file:
+        for line in csv_file:
+            row = line.rstrip("\n").split(",")
+            if len(row) < 2:
+                continue
+
+            game_id = row[1].strip()
+            if game_id == "":
+                continue
+
+            # New format: player ban is the final column.
+            player_ban = row[-1].strip() if len(row) >= 26 else ""
+            player_bans_by_game_id[game_id] = player_ban
+
+    return player_bans_by_game_id
 
 
 def fetch_all_matches(start_index, count):
@@ -185,7 +230,7 @@ def main():
 
     print("[3/3] Done.")
     print("Output file: Output.csv")
-    print("Columns: 5 metadata + 10 champions + 10 bans")
+    print("Columns: 5 metadata + 10 champions + 10 bans + 1 player_ban")
 
 
 if __name__ == "__main__":
