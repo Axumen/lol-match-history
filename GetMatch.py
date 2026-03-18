@@ -1,126 +1,192 @@
-import requests
 import json
 import os
 import time
 
-puuid = "A-KvvSAUCZsntcUJNiDJUV14oVGjCQFKzJj5k-rv6i5aAOFPfHq_W_t2516OpOh9-O1w8NzP5UcIGg"
-# App - A-KvvSAUCZsntcUJNiDJUV14oVGjCQFKzJj5k-rv6i5aAOFPfHq_W_t2516OpOh9-O1w8NzP5UcIGg Symphony
-# Dev - 7M50jVmrCSnHzJ9drVDkUIgzjKLlD2tZJwgjS0gxBJf-0HWxIlh3I4SWYd8A1iTw8VKy3OllBoK-cA
-pre_url = "https://sea.api.riotgames.com/lol/match/v5/matches/"
-api_key = "RGAPI-f4864035-c4a1-4b46-b887-333f5ed01a61"
+import requests
 
-def retrive_Match(start_index = 0, count = 20):
+from api_config import (
+    API_KEY,
+    DATA_DRAGON_CHAMPIONS_URL,
+    DATA_DRAGON_VERSIONS_URL,
+    NO_BAN_LABEL,
+    PRE_URL,
+    PUUID,
+)
 
-    # matchid_list = "https://sea.api.riotgames.com/lol/match/v5/matches/by-puuid/7M50jVmrCSnHzJ9drVDkUIgzjKLlD2tZJwgjS0gxBJf-0HWxIlh3I4SWYd8A1iTw8VKy3OllBoK-cA/ids?queue=420&type=ranked&start=0&count=10&api_key=RGAPI-dcd858a1-1a21-4a66-9122-3a630b996424"
-    matchid_list = pre_url + "by-puuid/" + puuid + "/ids?queue=420&type=ranked&start=" + str(start_index) +  "&count=" + str(count) + "&api_key=" + api_key
-
-#    print(matchid_list)
-
-    mid_list = requests.get(matchid_list).json()
-
-    for x in mid_list:
-        api_url = pre_url + x + "?api_key=" + api_key
-        resp = requests.get(api_url)
-        match_data = resp.json()
-        match_data.keys()
-
-        print(x + ".json")
-
-        with open(x + ".json", 'w') as f:
-            json.dump(match_data, f, indent=4)
+_CHAMPION_ID_TO_NAME = None
 
 
-list = []
-metas = []
-game_version = []
+def _request_json(url):
+    return requests.get(url).json()
 
-def print_CSV():
 
+def retrieve_match(start_index=0, count=20):
+    match_ids_url = (
+        f"{PRE_URL}by-puuid/{PUUID}/ids"
+        f"?queue=420&type=ranked&start={start_index}&count={count}&api_key={API_KEY}"
+    )
+    match_ids = _request_json(match_ids_url)
+
+    total = len(match_ids)
+    for index, match_id in enumerate(match_ids, start=1):
+        api_url = f"{PRE_URL}{match_id}?api_key={API_KEY}"
+        match_data = _request_json(api_url)
+        json_name = f"{match_id}.json"
+
+        with open(json_name, "w") as json_file:
+            json.dump(match_data, json_file, indent=4)
+
+        print(f"  - Saved {index}/{total}: {json_name}")
+
+
+def _get_champion_id_to_name_map():
+    global _CHAMPION_ID_TO_NAME
+
+    if _CHAMPION_ID_TO_NAME is not None:
+        return _CHAMPION_ID_TO_NAME
+
+    latest_version = _request_json(DATA_DRAGON_VERSIONS_URL)[0]
+    champions_url = DATA_DRAGON_CHAMPIONS_URL.format(version=latest_version)
+    champions_payload = _request_json(champions_url)
+
+    _CHAMPION_ID_TO_NAME = {
+        int(champion["key"]): champion["name"]
+        for champion in champions_payload.get("data", {}).values()
+    }
+
+    return _CHAMPION_ID_TO_NAME
+
+
+def _champion_id_to_name(champion_id):
+    if champion_id is None or champion_id < 0:
+        return NO_BAN_LABEL
+
+    champion_id_to_name = _get_champion_id_to_name_map()
+    return champion_id_to_name.get(champion_id, str(champion_id))
+
+
+def _get_player_index(metadata_participants):
+    player_index = 0
+    while metadata_participants[player_index] != PUUID:
+        player_index += 1
+    return player_index
+
+
+def _extract_bans(teams):
+    bans_by_turn = []
+
+    for team in teams:
+        for ban in team.get("bans", []):
+            bans_by_turn.append((ban.get("pickTurn", 999), ban.get("championId", -1)))
+
+    bans_by_turn.sort(key=lambda item: item[0])
+    champion_bans = [_champion_id_to_name(champion_id) for _, champion_id in bans_by_turn]
+
+    while len(champion_bans) < 10:
+        champion_bans.append(NO_BAN_LABEL)
+
+    return champion_bans[:10]
+
+
+def _append_match_data(data, match_meta, champions, bans):
+    player_index = _get_player_index(data["metadata"]["participants"])
+    participants = data["info"]["participants"]
+
+    match_meta.append(data["info"]["gameVersion"])
+    match_meta.append(data["info"]["gameId"])
+    match_meta.append(str(participants[player_index]["win"]))
+    match_meta.append(player_index)
+    match_meta.append(participants[player_index]["championName"])
+
+    if player_index < 5:
+        for i in range(0, 10):
+            champions.append(participants[i]["championName"])
+    else:
+        for i in range(5, 10):
+            champions.append(participants[i]["championName"])
+        for i in range(0, 5):
+            champions.append(participants[i]["championName"])
+
+    for champion_name in _extract_bans(data["info"].get("teams", [])):
+        bans.append(champion_name)
+
+
+def print_csv():
     file_count = 0
+    champions = []
+    match_meta = []
+    bans = []
 
-    dir_list = os.listdir()
+    for entry in os.listdir():
+        if not entry.endswith(".json"):
+            continue
 
-    for match_json in dir_list:
+        file_count += 1
+        with open(entry, "r") as json_file:
+            data = json.load(json_file)
+            _append_match_data(data, match_meta, champions, bans)
 
-        if match_json.endswith('.json'):
+    print(f"[2/3] Building Output.csv from {file_count} match file(s)...")
 
-            file_count += 1
+    with open("Output.csv", "w") as csv_file:
+        for row in range(file_count):
+            meta_start = row * 5
+            champs_start = row * 10
+            bans_start = row * 10
 
-            with open(match_json, 'r') as f:
+            for i in range(meta_start, meta_start + 5):
+                csv_file.write(f"{match_meta[i]},")
 
-                data = json.load(f)
+            for i in range(champs_start, champs_start + 10):
+                csv_file.write(f"{champions[i]},")
 
-                game_version = str(data['info']['gameVersion'])
+            for i in range(bans_start, bans_start + 10):
+                csv_file.write(f"{bans[i]},")
+
+            csv_file.write("\n")
 
 
-
-                i = 0
-
-                while data['metadata']['participants'][i] != puuid:
-                    i += 1
-
-                metas.append(data['info']['gameVersion'])
-                metas.append(data['info']['gameId'])
-                metas.append(str(data['info']['participants'][i]['win']))
-                metas.append(i)
-                metas.append(data['info']['participants'][i]['championName'])
-
-                if i < 5:
-                    for j in range(0, 10, 1):
-                        list.append(data['info']['participants'][j]['championName'])
-
-                else:
-                    for j in range(5, 10, 1):
-                        list.append(data['info']['participants'][j]['championName'])
-
-                    for j in range(0, 5, 1):
-                        list.append(data['info']['participants'][j]['championName'])
-
-            f.close()
-
-    print(file_count, " Matches")
-
-    with open('Output.csv', 'w') as fcsv:
-
-        for i in range(0, file_count, 1):
-
-            for j in range(i * 5, 5 * (i + 1), 1):
-                fcsv.write(str(metas[j]))
-                fcsv.write(",")
-
-            for j in range(i * 10, 10 * (i + 1), 1):
-                fcsv.write(list[j])
-                fcsv.write(",")
-
-            fcsv.write("\n")
-
-    fcsv.close()
-
-print("Match Index Start:")
-start_index = int(input())
-print("Number of Matches:")
-count = int(input())
-
-if count <= 100:
-
-    retrive_Match(start_index, count - 1)
-
-else:
+def fetch_all_matches(start_index, count):
+    if count <= 100:
+        retrieve_match(start_index, count - 1)
+        return
 
     while count > 0:
-
         interval = min(99, count)
-        retrive_Match(start_index, interval)
-        start_index = start_index + 100
-        count = count - 100
+        retrieve_match(start_index, interval)
+        start_index += 100
+        count -= 100
 
-        if count > 0:
-            pass
-        else: break
+        if count <= 0:
+            break
 
-        print("\nSleeping for 2 mins...")
+        print("\nRate limit cooldown: sleeping for 125 seconds...")
         time.sleep(125)
 
-print("\nOutput:")
-print_CSV()
 
+def _read_int(prompt_text, default):
+    raw_value = input(f"{prompt_text} [{default}]: ").strip()
+    if raw_value == "":
+        return default
+    return int(raw_value)
+
+
+def main():
+    print("=== League Match Export ===")
+    print("Recommended: Start Index = 0, Number of Matches = 20")
+
+    start_index = _read_int("Start Index", 0)
+    count = _read_int("Number of Matches", 20)
+
+    print("\n[1/3] Fetching match JSON files...")
+    fetch_all_matches(start_index, count)
+
+    print_csv()
+
+    print("[3/3] Done.")
+    print("Output file: Output.csv")
+    print("Columns: 5 metadata + 10 champions + 10 bans")
+
+
+if __name__ == "__main__":
+    main()
