@@ -1,126 +1,144 @@
-import requests
 import json
 import os
 import time
 
-puuid = "A-KvvSAUCZsntcUJNiDJUV14oVGjCQFKzJj5k-rv6i5aAOFPfHq_W_t2516OpOh9-O1w8NzP5UcIGg"
+import requests
+
+PUUID = "A-KvvSAUCZsntcUJNiDJUV14oVGjCQFKzJj5k-rv6i5aAOFPfHq_W_t2516OpOh9-O1w8NzP5UcIGg"
 # App - A-KvvSAUCZsntcUJNiDJUV14oVGjCQFKzJj5k-rv6i5aAOFPfHq_W_t2516OpOh9-O1w8NzP5UcIGg Symphony
 # Dev - 7M50jVmrCSnHzJ9drVDkUIgzjKLlD2tZJwgjS0gxBJf-0HWxIlh3I4SWYd8A1iTw8VKy3OllBoK-cA
-pre_url = "https://sea.api.riotgames.com/lol/match/v5/matches/"
-api_key = "RGAPI-f4864035-c4a1-4b46-b887-333f5ed01a61"
-
-def retrive_Match(start_index = 0, count = 20):
-
-    # matchid_list = "https://sea.api.riotgames.com/lol/match/v5/matches/by-puuid/7M50jVmrCSnHzJ9drVDkUIgzjKLlD2tZJwgjS0gxBJf-0HWxIlh3I4SWYd8A1iTw8VKy3OllBoK-cA/ids?queue=420&type=ranked&start=0&count=10&api_key=RGAPI-dcd858a1-1a21-4a66-9122-3a630b996424"
-    matchid_list = pre_url + "by-puuid/" + puuid + "/ids?queue=420&type=ranked&start=" + str(start_index) +  "&count=" + str(count) + "&api_key=" + api_key
-
-#    print(matchid_list)
-
-    mid_list = requests.get(matchid_list).json()
-
-    for x in mid_list:
-        api_url = pre_url + x + "?api_key=" + api_key
-        resp = requests.get(api_url)
-        match_data = resp.json()
-        match_data.keys()
-
-        print(x + ".json")
-
-        with open(x + ".json", 'w') as f:
-            json.dump(match_data, f, indent=4)
+PRE_URL = "https://sea.api.riotgames.com/lol/match/v5/matches/"
+API_KEY = "RGAPI-f4864035-c4a1-4b46-b887-333f5ed01a61"
 
 
-list = []
-metas = []
-game_version = []
+def retrieve_match(start_index=0, count=20):
+    match_ids_url = (
+        f"{PRE_URL}by-puuid/{PUUID}/ids"
+        f"?queue=420&type=ranked&start={start_index}&count={count}&api_key={API_KEY}"
+    )
+    match_ids = requests.get(match_ids_url).json()
 
-def print_CSV():
+    for match_id in match_ids:
+        api_url = f"{PRE_URL}{match_id}?api_key={API_KEY}"
+        response = requests.get(api_url)
+        match_data = response.json()
 
+        print(f"{match_id}.json")
+
+        with open(f"{match_id}.json", "w") as json_file:
+            json.dump(match_data, json_file, indent=4)
+
+
+def _get_player_index(metadata_participants):
+    player_index = 0
+    while metadata_participants[player_index] != PUUID:
+        player_index += 1
+    return player_index
+
+
+def _extract_bans(teams):
+    bans_by_turn = []
+
+    for team in teams:
+        for ban in team.get("bans", []):
+            bans_by_turn.append((ban.get("pickTurn", 999), ban.get("championId", -1)))
+
+    bans_by_turn.sort(key=lambda item: item[0])
+    champion_bans = [champion_id for _, champion_id in bans_by_turn]
+
+    while len(champion_bans) < 10:
+        champion_bans.append(-1)
+
+    return champion_bans[:10]
+
+
+def _append_match_data(data, match_meta, champions, bans):
+    player_index = _get_player_index(data["metadata"]["participants"])
+    participants = data["info"]["participants"]
+
+    match_meta.append(data["info"]["gameVersion"])
+    match_meta.append(data["info"]["gameId"])
+    match_meta.append(str(participants[player_index]["win"]))
+    match_meta.append(player_index)
+    match_meta.append(participants[player_index]["championName"])
+
+    if player_index < 5:
+        for i in range(0, 10):
+            champions.append(participants[i]["championName"])
+    else:
+        for i in range(5, 10):
+            champions.append(participants[i]["championName"])
+        for i in range(0, 5):
+            champions.append(participants[i]["championName"])
+
+    for champion_id in _extract_bans(data["info"].get("teams", [])):
+        bans.append(champion_id)
+
+
+def print_csv():
     file_count = 0
+    champions = []
+    match_meta = []
+    bans = []
 
-    dir_list = os.listdir()
+    for entry in os.listdir():
+        if not entry.endswith(".json"):
+            continue
 
-    for match_json in dir_list:
-
-        if match_json.endswith('.json'):
-
-            file_count += 1
-
-            with open(match_json, 'r') as f:
-
-                data = json.load(f)
-
-                game_version = str(data['info']['gameVersion'])
-
-
-
-                i = 0
-
-                while data['metadata']['participants'][i] != puuid:
-                    i += 1
-
-                metas.append(data['info']['gameVersion'])
-                metas.append(data['info']['gameId'])
-                metas.append(str(data['info']['participants'][i]['win']))
-                metas.append(i)
-                metas.append(data['info']['participants'][i]['championName'])
-
-                if i < 5:
-                    for j in range(0, 10, 1):
-                        list.append(data['info']['participants'][j]['championName'])
-
-                else:
-                    for j in range(5, 10, 1):
-                        list.append(data['info']['participants'][j]['championName'])
-
-                    for j in range(0, 5, 1):
-                        list.append(data['info']['participants'][j]['championName'])
-
-            f.close()
+        file_count += 1
+        with open(entry, "r") as json_file:
+            data = json.load(json_file)
+            _append_match_data(data, match_meta, champions, bans)
 
     print(file_count, " Matches")
 
-    with open('Output.csv', 'w') as fcsv:
+    with open("Output.csv", "w") as csv_file:
+        for row in range(file_count):
+            meta_start = row * 5
+            champs_start = row * 10
+            bans_start = row * 10
 
-        for i in range(0, file_count, 1):
+            for i in range(meta_start, meta_start + 5):
+                csv_file.write(f"{match_meta[i]},")
 
-            for j in range(i * 5, 5 * (i + 1), 1):
-                fcsv.write(str(metas[j]))
-                fcsv.write(",")
+            for i in range(champs_start, champs_start + 10):
+                csv_file.write(f"{champions[i]},")
 
-            for j in range(i * 10, 10 * (i + 1), 1):
-                fcsv.write(list[j])
-                fcsv.write(",")
+            for i in range(bans_start, bans_start + 10):
+                csv_file.write(f"{bans[i]},")
 
-            fcsv.write("\n")
+            csv_file.write("\n")
 
-    fcsv.close()
 
-print("Match Index Start:")
-start_index = int(input())
-print("Number of Matches:")
-count = int(input())
-
-if count <= 100:
-
-    retrive_Match(start_index, count - 1)
-
-else:
+def fetch_all_matches(start_index, count):
+    if count <= 100:
+        retrieve_match(start_index, count - 1)
+        return
 
     while count > 0:
-
         interval = min(99, count)
-        retrive_Match(start_index, interval)
-        start_index = start_index + 100
-        count = count - 100
+        retrieve_match(start_index, interval)
+        start_index += 100
+        count -= 100
 
-        if count > 0:
-            pass
-        else: break
+        if count <= 0:
+            break
 
         print("\nSleeping for 2 mins...")
         time.sleep(125)
 
-print("\nOutput:")
-print_CSV()
 
+def main():
+    print("Match Index Start:")
+    start_index = int(input())
+    print("Number of Matches:")
+    count = int(input())
+
+    fetch_all_matches(start_index, count)
+
+    print("\nOutput:")
+    print_csv()
+
+
+if __name__ == "__main__":
+    main()
