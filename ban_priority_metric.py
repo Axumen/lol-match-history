@@ -85,23 +85,27 @@ def _read_matches(path: Path) -> List[MatchRow]:
     return matches
 
 
-def _select_matches(
-    matches: List[MatchRow], player_champion: str, max_matches: int
-) -> List[MatchRow]:
-    champion_key = player_champion.strip().lower()
-    filtered = [m for m in matches if m.player_champion.strip().lower() == champion_key]
-
+def _select_recent_window(matches: List[MatchRow], max_matches: int) -> List[MatchRow]:
     if max_matches <= 0:
         return []
 
-    # Output.csv is written in os.listdir() order, which is typically by creation/name,
-    # so use the latest rows from the end for a practical "most recent N" behavior.
-    return filtered[-max_matches:]
+    return matches[-max_matches:]
 
 
-def _compute_ban_priority_rows(selected_matches: Iterable[MatchRow]) -> List[Dict[str, float]]:
-    selected = list(selected_matches)
+def _filter_matches_by_champion(
+    matches: Iterable[MatchRow], player_champion: str
+) -> List[MatchRow]:
+    champion_key = player_champion.strip().lower()
+    return [m for m in matches if m.player_champion.strip().lower() == champion_key]
+
+
+def _compute_ban_priority_rows(
+    champion_matches: Iterable[MatchRow], ban_matches: Iterable[MatchRow]
+) -> List[Dict[str, float]]:
+    selected = list(champion_matches)
+    ban_reference = list(ban_matches)
     total_matches = len(selected)
+    ban_reference_matches = len(ban_reference)
 
     if total_matches == 0:
         return []
@@ -127,6 +131,7 @@ def _compute_ban_priority_rows(selected_matches: Iterable[MatchRow]) -> List[Dic
             else:
                 counters[champ].losses_enemy += 1
 
+    for match in ban_reference:
         unique_bans = {ban for ban in match.bans if ban and ban.lower() != "no ban"}
         for banned_champ in unique_bans:
             counters[banned_champ].banned_any += 1
@@ -145,8 +150,9 @@ def _compute_ban_priority_rows(selected_matches: Iterable[MatchRow]) -> List[Dic
         threat = (0.5 - pE_tilde) + ALPHA * wA * (0.5 - pA_tilde)
 
         # Approximation from Output.csv: we do not know which exact ban is "your" ban,
-        # so estimate with probability that champ is banned by any ban slot in the match.
-        b_minus_you = c.banned_any / total_matches
+        # so estimate with probability that champ is banned by any ban slot in the
+        # recent-match window (ban behavior does not depend on chosen champion).
+        b_minus_you = c.banned_any / ban_reference_matches if ban_reference_matches else 0.0
         ban_priority = threat * (1.0 - b_minus_you)
 
         rows.append(
@@ -224,19 +230,20 @@ def main() -> None:
     if not player_champion:
         raise ValueError("Champion name is required.")
 
-    match_count = _read_positive_int("How many matches to analyze", 50)
+    match_count = _read_positive_int("How many recent matches to analyze", 50)
 
     matches = _read_matches(INPUT_FILE)
-    selected = _select_matches(matches, player_champion, match_count)
+    recent_window = _select_recent_window(matches, match_count)
+    selected = _filter_matches_by_champion(recent_window, player_champion)
 
     if not selected:
         print(
-            f"No rows found in {INPUT_FILE} for player champion '{player_champion}' "
-            f"within requested match count {match_count}."
+            f"No rows found in the last {match_count} rows of {INPUT_FILE} where "
+            f"the player champion is '{player_champion}'."
         )
         return
 
-    rows = _compute_ban_priority_rows(selected)
+    rows = _compute_ban_priority_rows(selected, recent_window)
     _write_output(rows, OUTPUT_FILE)
 
     print(
