@@ -33,10 +33,11 @@ class MatchRow:
     allies: List[str]
     enemies: List[str]
     bans: List[str]
+    player_ban: str
 
 
 # Expected row layout from GetMatch.py:
-# 5 metadata + 10 champions (allies then enemies) + 10 bans
+# 5 metadata + 10 champions (allies then enemies) + 10 bans [+ optional player_ban]
 MIN_COLUMNS = 25
 
 
@@ -68,6 +69,7 @@ def _read_matches(path: Path) -> List[MatchRow]:
             player_index = int(row[3])
             champions = row[5:15]
             bans = row[15:25]
+            player_ban = row[25].strip() if len(row) >= 26 else ""
 
             matches.append(
                 MatchRow(
@@ -79,6 +81,7 @@ def _read_matches(path: Path) -> List[MatchRow]:
                     allies=champions[:5],
                     enemies=champions[5:],
                     bans=bans,
+                    player_ban=player_ban,
                 )
             )
 
@@ -132,7 +135,7 @@ def _compute_ban_priority_rows(
                 counters[champ].losses_enemy += 1
 
     for match in ban_reference:
-        unique_bans = {ban for ban in match.bans if ban and ban.lower() != "no ban"}
+        unique_bans = _other_9_unique_bans(match)
         for banned_champ in unique_bans:
             counters[banned_champ].banned_any += 1
 
@@ -176,6 +179,30 @@ def _compute_ban_priority_rows(
 
     rows.sort(key=lambda row: row["ban_priority"], reverse=True)
     return rows
+
+
+def _other_9_unique_bans(match: MatchRow) -> set:
+    normalized_non_empty_bans = [ban.strip() for ban in match.bans if ban and ban.strip()]
+    non_no_ban_bans = [ban for ban in normalized_non_empty_bans if ban.lower() != "no ban"]
+
+    # If player ban is unknown/empty, fall back to using the full 10-ban row.
+    if not match.player_ban:
+        return set(non_no_ban_bans)
+
+    player_ban_normalized = match.player_ban.strip()
+    if player_ban_normalized.lower() == "no ban":
+        return set(non_no_ban_bans)
+
+    # Bias correction: remove one instance of the player's own ban from the 10-ban list
+    # so b_minus_you estimates "banned by the other 9 players".
+    remaining_bans = list(non_no_ban_bans)
+    try:
+        remaining_bans.remove(player_ban_normalized)
+    except ValueError:
+        # If the supplied player ban is not present, keep all observed bans.
+        pass
+
+    return set(remaining_bans)
 
 
 def _write_output(rows: List[Dict[str, float]], output_file: Path) -> None:
