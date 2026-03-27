@@ -288,25 +288,40 @@ def main() -> None:
 
     match_count = _read_positive_int("How many recent matches to analyze", 50)
 
-    matches = _read_matches(INPUT_FILE)
+    generate_ban_priority(player_champion, match_count)
+
+
+def generate_ban_priority(
+    player_champion: str,
+    match_count: int = 50,
+    input_file: Path = INPUT_FILE,
+    output_file: Path = OUTPUT_FILE,
+) -> List[Dict[str, float]]:
+    if not player_champion or not player_champion.strip():
+        raise ValueError("Champion name is required.")
+    if match_count <= 0:
+        raise ValueError("Match count must be positive.")
+
+    matches = _read_matches(input_file)
     recent_window = _select_recent_window(matches, match_count)
     selected = _filter_matches_by_champion(recent_window, player_champion)
 
     if not selected:
         print(
-            f"No rows found in the last {match_count} rows of {INPUT_FILE} where "
+            f"No rows found in the last {match_count} rows of {input_file} where "
             f"the player champion is '{player_champion}'."
         )
-        return
+        return []
 
     rows = _compute_ban_priority_rows(selected, recent_window)
-    _write_output(rows, OUTPUT_FILE)
+    _write_output(rows, output_file)
 
     print(
         f"Analyzed {len(selected)} match(es) for champion '{player_champion}'. "
-        f"Wrote {len(rows)} champion rows to {OUTPUT_FILE}."
+        f"Wrote {len(rows)} champion rows to {output_file}."
     )
     _print_preview(rows)
+    return rows
 
 
 if __name__ == "__main__":

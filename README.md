@@ -89,3 +89,20 @@ Use top `ban_priority` rows first.
 - **Low/negative threat**: usually low-priority bans for this player/champion context.
 
 Practical tip: trust rankings more when `n_enemy` and `n_ally` are reasonably large.
+
+---
+
+## Quick workflow (JSON folder -> Output + Metric)
+
+1. Put downloaded match JSON files in `./match_json/`.
+2. Run:
+
+   ```bash
+   python get_match.py
+   ```
+
+3. Choose **`Fetch matches from API first? [y/N]`**:
+   - `y` = fetch additional JSONs into `./match_json/`
+   - `n` = use only existing JSON files in `./match_json/`
+4. The script automatically rebuilds `Output.csv` from that folder.
+5. Optionally choose **`Generate BanPriorityOutput.csv now? [y/N]`** to generate metric output in the same run.
