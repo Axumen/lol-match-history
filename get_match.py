@@ -4,6 +4,7 @@ import time
 
 import requests
 
+from ban_priority_metric import generate_ban_priority
 from api_config import (
     API_KEY,
     DATA_DRAGON_CHAMPIONS_URL,
@@ -16,24 +17,27 @@ from api_config import (
 _CHAMPION_ID_TO_NAME = None
 OUTPUT_FILE = "Output.csv"
 NEW_OUTPUT_FILE = "NewOutput.csv"
+DEFAULT_MATCH_JSON_DIR = "match_json"
 
 
 def _request_json(url):
     return requests.get(url).json()
 
 
-def retrieve_match(start_index=0, count=20):
+def retrieve_match(start_index=0, count=20, output_dir=DEFAULT_MATCH_JSON_DIR):
     match_ids_url = (
         f"{PRE_URL}by-puuid/{PUUID}/ids"
         f"?queue=420&type=ranked&start={start_index}&count={count}&api_key={API_KEY}"
     )
     match_ids = _request_json(match_ids_url)
 
+    os.makedirs(output_dir, exist_ok=True)
+
     total = len(match_ids)
     for index, match_id in enumerate(match_ids, start=1):
         api_url = f"{PRE_URL}{match_id}?api_key={API_KEY}"
         match_data = _request_json(api_url)
-        json_name = f"{match_id}.json"
+        json_name = os.path.join(output_dir, f"{match_id}.json")
 
         with open(json_name, "w") as json_file:
             json.dump(match_data, json_file, indent=4)
@@ -113,19 +117,26 @@ def _append_match_data(data, match_meta, champions, bans):
         bans.append(champion_name)
 
 
-def print_csv():
+def print_csv(json_dir=DEFAULT_MATCH_JSON_DIR):
     file_count = 0
     champions = []
     match_meta = []
     bans = []
     existing_player_bans = _load_existing_player_bans()
 
-    for entry in os.listdir():
+    if not os.path.isdir(json_dir):
+        raise FileNotFoundError(
+            f"JSON folder not found: {json_dir}. "
+            f"Create it and place downloaded match JSON files inside."
+        )
+
+    for entry in os.listdir(json_dir):
         if not entry.endswith(".json"):
             continue
 
         file_count += 1
-        with open(entry, "r") as json_file:
+        json_path = os.path.join(json_dir, entry)
+        with open(json_path, "r") as json_file:
             data = json.load(json_file)
             _append_match_data(data, match_meta, champions, bans)
 
@@ -191,14 +202,17 @@ def _load_existing_player_bans():
     return player_bans_by_game_id
 
 
-def fetch_all_matches(start_index, count):
+def fetch_all_matches(start_index, count, output_dir=DEFAULT_MATCH_JSON_DIR):
+    if count <= 0:
+        return
+
     if count <= 100:
-        retrieve_match(start_index, count - 1)
+        retrieve_match(start_index, count - 1, output_dir=output_dir)
         return
 
     while count > 0:
         interval = min(99, count)
-        retrieve_match(start_index, interval)
+        retrieve_match(start_index, interval, output_dir=output_dir)
         start_index += 100
         count -= 100
 
@@ -218,19 +232,31 @@ def _read_int(prompt_text, default):
 
 def main():
     print("=== League Match Export ===")
-    print("Recommended: Start Index = 0, Number of Matches = 20")
+    print(f"Place downloaded match JSON files in: ./{DEFAULT_MATCH_JSON_DIR}")
+    print("You can optionally fetch more matches from API before generating output.")
 
-    start_index = _read_int("Start Index", 0)
-    count = _read_int("Number of Matches", 20)
+    fetch_from_api = input("Fetch matches from API first? [y/N]: ").strip().lower() == "y"
+    if fetch_from_api:
+        print("Recommended: Start Index = 0, Number of Matches = 20")
+        start_index = _read_int("Start Index", 0)
+        count = _read_int("Number of Matches", 20)
+    else:
+        start_index = 0
+        count = 0
 
-    print("\n[1/3] Fetching match JSON files...")
-    fetch_all_matches(start_index, count)
+    print("\n[1/3] Preparing match JSON files...")
+    fetch_all_matches(start_index, count, output_dir=DEFAULT_MATCH_JSON_DIR)
 
-    print_csv()
+    print_csv(json_dir=DEFAULT_MATCH_JSON_DIR)
 
     print("[3/3] Done.")
     print("Output file: Output.csv")
     print("Columns: 5 metadata + 10 champions + 10 bans + 1 player_ban")
+
+    if input("Generate BanPriorityOutput.csv now? [y/N]: ").strip().lower() == "y":
+        player_champion = input("Player champion to analyze (exact champion name): ").strip()
+        match_count = _read_int("How many recent matches to analyze", 50)
+        generate_ban_priority(player_champion, match_count)
 
 
 if __name__ == "__main__":
