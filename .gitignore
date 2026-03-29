@@ -1,5 +1,8 @@
 api_config.py
 
+match_json/
+api_config.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

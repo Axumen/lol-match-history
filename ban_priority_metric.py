@@ -326,3 +326,5 @@ def generate_ban_priority(
 
 if __name__ == "__main__":
     main()
+    
+    input("Press Enter to exit...") 
