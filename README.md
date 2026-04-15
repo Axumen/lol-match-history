@@ -154,7 +154,7 @@ Useful flags:
 - `--input-file Output.csv`
 - `--no-future-uncertainty` to disable `U(c)`.
 
-The script prints JSON containing:
-- `pick`
-- full `rankings`
-- per-term score breakdown (`ally_terms`, `enemy_terms`, `future_uncertainty`).
+The script prints:
+- a summary table for **all candidates** (`V(c|S_t)`, ally sum, enemy sum, `U(c)`)
+- a per-candidate calculated-value breakdown (`A(c,a)`, `E(c,e)`, `U(c)`, total)
+- raw JSON containing `pick`, full `rankings`, and term-level values.

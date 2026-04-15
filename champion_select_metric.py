@@ -367,6 +367,68 @@ def _collect_inputs_step_by_step(args: argparse.Namespace) -> argparse.Namespace
     return args
 
 
+def _print_rankings_summary_table(result: Dict[str, object]) -> None:
+    rankings = result.get("rankings", [])
+    if not rankings:
+        print("No candidate rankings to display.")
+        return
+
+    print("\n=== Summary Table (All Candidates) ===")
+    headers = ["Rank", "Candidate", "V(c|S_t)", "Ally ΣA", "Enemy ΣE", "U(c)"]
+    row_format = "{:<6}{:<18}{:>12}{:>12}{:>12}{:>12}"
+    print(row_format.format(*headers))
+
+    for index, row in enumerate(rankings, start=1):
+        ally_sum = sum(term["score"] for term in row.get("ally_terms", []))
+        enemy_sum = sum(term["score"] for term in row.get("enemy_terms", []))
+        u_value = float(row.get("future_uncertainty", 0.0))
+        total = float(row.get("score", 0.0))
+        print(
+            row_format.format(
+                index,
+                str(row.get("champion", ""))[:17],
+                f"{total:.4f}",
+                f"{ally_sum:.4f}",
+                f"{enemy_sum:.4f}",
+                f"{u_value:.4f}",
+            )
+        )
+
+    print(f"\nRecommended pick: {result.get('pick')}")
+
+
+def _print_candidate_value_breakdown(result: Dict[str, object]) -> None:
+    rankings = result.get("rankings", [])
+    if not rankings:
+        return
+
+    print("\n=== Per-Candidate Calculated Values ===")
+    for index, row in enumerate(rankings, start=1):
+        champion = row.get("champion", "")
+        total = float(row.get("score", 0.0))
+        u_value = float(row.get("future_uncertainty", 0.0))
+        ally_terms = row.get("ally_terms", [])
+        enemy_terms = row.get("enemy_terms", [])
+
+        print(f"\n[{index}] {champion}")
+        print(f"  V(c|S_t): {total:.6f}")
+        print(f"  U(c):     {u_value:.6f}")
+
+        if ally_terms:
+            print("  Ally terms:")
+            for term in ally_terms:
+                print(f"    - A({champion}, {term['ally']}): {float(term['score']):.6f}")
+        else:
+            print("  Ally terms: (none)")
+
+        if enemy_terms:
+            print("  Enemy terms:")
+            for term in enemy_terms:
+                print(f"    - E({champion}, {term['enemy']}): {float(term['score']):.6f}")
+        else:
+            print("  Enemy terms: (none)")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
@@ -411,6 +473,9 @@ def main() -> None:
         include_future_uncertainty=not args.no_future_uncertainty,
     )
 
+    _print_rankings_summary_table(result)
+    _print_candidate_value_breakdown(result)
+    print("\n=== Raw JSON ===")
     print(json.dumps(result, indent=2))
 
 
