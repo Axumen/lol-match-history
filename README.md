@@ -121,11 +121,18 @@ At champion-select time, it computes for each candidate champion `c`:
 
 ### Required inputs
 
+<<<<<<< codex/locate-new-feature-in-champion-select.md-nmg69j
+- `ally_faceup_champions`
+- `enemy_faceup_champions`
+
+`player_role`, `candidate_champions`, `match_count`, `input_file`, and future-uncertainty toggle are now loaded from `api_config.py` defaults.
+=======
 - `player_role`
 - `ally_faceup_champions`
 - `enemy_faceup_champions`
 - `candidate_champions`
 - Optional: `player_champion_context`
+>>>>>>> main
 
 The engine enforces that all three faceup/candidate collections are provided before scoring.
 
@@ -138,11 +145,27 @@ python champion_select_metric.py
 ```
 
 The script will ask for required fields one by one:
+<<<<<<< codex/locate-new-feature-in-champion-select.md-nmg69j
+- visible allies
+- visible enemies
+
+Everything else is read from `api_config.py`.
+
+### Configure defaults once in `api_config.py`
+
+Set these values so champion-select only needs ally/enemy inputs:
+- `CHAMPION_SELECT_DEFAULT_ROLE`
+- `CHAMPION_SELECT_DEFAULT_CANDIDATES`
+- `CHAMPION_SELECT_DEFAULT_INPUT_FILE` (default `Output.csv`)
+- `CHAMPION_SELECT_DEFAULT_MATCH_COUNT` (default `200`)
+- `CHAMPION_SELECT_DEFAULT_INCLUDE_FUTURE_UNCERTAINTY`
+=======
 - role
 - visible allies
 - visible enemies
 - candidate champions
 - and optional settings
+>>>>>>> main
 
 ### Optional one-line flags
 
