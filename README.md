@@ -129,7 +129,22 @@ At champion-select time, it computes for each candidate champion `c`:
 
 The engine enforces that all three faceup/candidate collections are provided before scoring.
 
-### Quick CLI usage
+### Quick usage (step-by-step TUI)
+
+Run:
+
+```bash
+python champion_select_metric.py
+```
+
+The script will ask for required fields one by one:
+- role
+- visible allies
+- visible enemies
+- candidate champions
+- and optional settings
+
+### Optional one-line flags
 
 ```bash
 python champion_select_metric.py   --role MID   --context Ahri   --allies "Leona,Vi"   --enemies "Orianna,Lee Sin"   --candidates "Ahri,Syndra,Vex"   --match-count 200
