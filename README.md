@@ -137,8 +137,11 @@ python champion_select_metric.py
 ```
 
 The script will ask for required fields one by one:
-- visible allies
-- visible enemies
+- whether your team is first pick
+- then champions by phase:
+  - if first pick: ally → enemy → ally
+  - if not first pick: enemy → ally → enemy
+- enter `0` at any phase prompt to stop early and continue with results
 
 Everything else is read from `api_config.py`.
 

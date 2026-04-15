@@ -280,13 +280,21 @@ def _parse_csv_list(raw: str) -> List[str]:
     return [part.strip() for part in raw.split(",") if part.strip()]
 
 
-def _prompt_required_list(label: str) -> List[str]:
+def _prompt_optional_phase_list(label: str) -> Optional[List[str]]:
+    raw = input(f"{label} (comma-separated, enter 0 to stop): ").strip()
+    if raw == "0":
+        return None
+    return _parse_csv_list(raw)
+
+
+def _prompt_first_pick() -> bool:
     while True:
-        raw = input(f"{label} (comma-separated): ").strip()
-        parsed = _parse_csv_list(raw)
-        if parsed:
-            return parsed
-        print(f"{label} is required and must include at least one champion.")
+        raw = input("Is your team first pick? [y/N]: ").strip().lower()
+        if raw in {"", "n", "no"}:
+            return False
+        if raw in {"y", "yes"}:
+            return True
+        print("Please answer with y/yes or n/no.")
 
 
 def _collect_inputs_step_by_step(args: argparse.Namespace) -> argparse.Namespace:
@@ -301,12 +309,42 @@ def _collect_inputs_step_by_step(args: argparse.Namespace) -> argparse.Namespace
 
     role = args.role or CHAMPION_SELECT_DEFAULT_ROLE
     context = args.context if args.context is not None else CHAMPION_SELECT_DEFAULT_CONTEXT
-    allies = args.allies if args.allies is not None else ",".join(
-        _prompt_required_list("1) Visible ally champions")
-    )
-    enemies = args.enemies if args.enemies is not None else ",".join(
-        _prompt_required_list("2) Visible enemy champions")
-    )
+    allies_from_prompts: List[str] = []
+    enemies_from_prompts: List[str] = []
+
+    if args.allies is not None and args.enemies is not None:
+        allies = args.allies
+        enemies = args.enemies
+    else:
+        is_first_pick = _prompt_first_pick()
+
+        if is_first_pick:
+            phase_sequence = [
+                ("ally", "1) Ally champions shown in phase 1"),
+                ("enemy", "2) Enemy champions shown in phase 2"),
+                ("ally", "3) Ally champions shown in phase 3"),
+            ]
+        else:
+            phase_sequence = [
+                ("enemy", "1) Enemy champions shown in phase 1"),
+                ("ally", "2) Ally champions shown in phase 2"),
+                ("enemy", "3) Enemy champions shown in phase 3"),
+            ]
+
+        for team, prompt in phase_sequence:
+            phase_values = _prompt_optional_phase_list(prompt)
+            if phase_values is None:
+                break
+            if team == "ally":
+                allies_from_prompts.extend(phase_values)
+            else:
+                enemies_from_prompts.extend(phase_values)
+
+        allies = args.allies if args.allies is not None else ",".join(allies_from_prompts)
+        enemies = args.enemies if args.enemies is not None else ",".join(enemies_from_prompts)
+
+    if args.allies is None and args.enemies is None and not allies_from_prompts and not enemies_from_prompts:
+        raise ValueError("No phase inputs were provided. Enter champions or use 0 only after at least one phase.")
     candidates = args.candidates if args.candidates is not None else ",".join(
         CHAMPION_SELECT_DEFAULT_CANDIDATES
     )
