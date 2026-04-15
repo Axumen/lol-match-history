@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
+<<<<<<< codex/locate-new-feature-in-champion-select.md-nmg69j
 from api_config import (
     CHAMPION_SELECT_DEFAULT_CANDIDATES,
     CHAMPION_SELECT_DEFAULT_CONTEXT,
@@ -17,6 +18,9 @@ from api_config import (
 )
 
 INPUT_FILE = CHAMPION_SELECT_DEFAULT_INPUT_FILE
+=======
+INPUT_FILE = Path("Output.csv")
+>>>>>>> main
 EPSILON = 1e-9
 
 
@@ -334,6 +338,7 @@ def _prompt_yes_no(label: str, default_yes: bool = True) -> bool:
 
 def _collect_inputs_step_by_step(args: argparse.Namespace) -> argparse.Namespace:
     print("=== Champion Select Draft Scorer ===")
+<<<<<<< codex/locate-new-feature-in-champion-select.md-nmg69j
     print("Using defaults from api_config.py for role/candidates/options.")
     print("Only ally and enemy visible champions are requested.\n")
 
@@ -362,6 +367,38 @@ def _collect_inputs_step_by_step(args: argparse.Namespace) -> argparse.Namespace
         if args.no_future_uncertainty
         else CHAMPION_SELECT_DEFAULT_INCLUDE_FUTURE_UNCERTAINTY
     )
+=======
+    print("Enter draft context step by step.\n")
+
+    role = args.role or _prompt_required_text("1) Player role")
+    context = args.context if args.context is not None else _prompt_optional_text(
+        "2) Player champion context"
+    )
+    allies = args.allies if args.allies is not None else ",".join(
+        _prompt_required_list("3) Visible ally champions")
+    )
+    enemies = args.enemies if args.enemies is not None else ",".join(
+        _prompt_required_list("4) Visible enemy champions")
+    )
+    candidates = args.candidates if args.candidates is not None else ",".join(
+        _prompt_required_list("5) Candidate champions to score")
+    )
+
+    input_file = args.input_file
+    if args.input_file == INPUT_FILE:
+        custom_input = input(f"6) Input CSV path [{INPUT_FILE}]: ").strip()
+        input_file = Path(custom_input) if custom_input else INPUT_FILE
+
+    match_count = args.match_count
+    if args.match_count == 200:
+        match_count = _prompt_positive_int("7) Recent match window size", 200)
+
+    include_future_uncertainty = not args.no_future_uncertainty
+    if not args.no_future_uncertainty:
+        include_future_uncertainty = _prompt_yes_no(
+            "8) Include future uncertainty term U(c)", default_yes=True
+        )
+>>>>>>> main
 
     args.role = role
     args.context = context
@@ -443,6 +480,7 @@ def main() -> None:
             "Runs as a minimal step-by-step TUI by default."
         )
     )
+<<<<<<< codex/locate-new-feature-in-champion-select.md-nmg69j
     parser.add_argument("--role", default=None, help="Optional override for role.")
     parser.add_argument("--context", default=None, help="Optional override for champion context.")
     parser.add_argument("--allies", help="Comma-separated visible ally champions.")
@@ -453,15 +491,32 @@ def main() -> None:
         type=Path,
         default=None,
         help=f"Optional override for input CSV path (default from api_config.py: {INPUT_FILE}).",
+=======
+    parser.add_argument("--role", help="Player role (e.g., TOP/JUNGLE/MID/ADC/SUPPORT).")
+    parser.add_argument("--context", default=None, help="Optional player champion context.")
+    parser.add_argument("--allies", help="Comma-separated visible ally champions.")
+    parser.add_argument("--enemies", help="Comma-separated visible enemy champions.")
+    parser.add_argument("--candidates", help="Comma-separated candidate champions to score.")
+    parser.add_argument(
+        "--input-file",
+        type=Path,
+        default=INPUT_FILE,
+        help=f"Input CSV path (default: {INPUT_FILE}).",
+>>>>>>> main
     )
     parser.add_argument(
         "--match-count",
         type=int,
+<<<<<<< codex/locate-new-feature-in-champion-select.md-nmg69j
         default=None,
         help=(
             "Optional override for recent-match window "
             f"(default from api_config.py: {CHAMPION_SELECT_DEFAULT_MATCH_COUNT})."
         ),
+=======
+        default=200,
+        help="How many recent matches to use.",
+>>>>>>> main
     )
     parser.add_argument(
         "--no-future-uncertainty",
@@ -491,3 +546,8 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+<<<<<<< codex/locate-new-feature-in-champion-select.md-nmg69j
+=======
+
+    input("Press Enter to exit...") 
+>>>>>>> main
