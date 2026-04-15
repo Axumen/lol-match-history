@@ -1,6 +1,5 @@
 import argparse
 import csv
-import json
 import math
 from collections import Counter
 from dataclasses import dataclass
@@ -300,9 +299,6 @@ def _collect_inputs_step_by_step(args: argparse.Namespace) -> argparse.Namespace
             "Choose only one of --include-future-uncertainty or --no-future-uncertainty."
         )
 
-    print("Using defaults from api_config.py for role/candidates/options.")
-    print("Only ally and enemy visible champions are requested.\n")
-
     role = args.role or CHAMPION_SELECT_DEFAULT_ROLE
     context = args.context if args.context is not None else CHAMPION_SELECT_DEFAULT_CONTEXT
     allies = args.allies if args.allies is not None else ",".join(
@@ -457,8 +453,6 @@ def main() -> None:
 
     _print_rankings_summary_table(result)
     _print_candidate_value_breakdown(result)
-    print("\n=== Raw JSON ===")
-    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

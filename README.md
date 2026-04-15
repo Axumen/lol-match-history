@@ -164,5 +164,4 @@ Useful flags:
 
 The script prints:
 - a summary table for **all candidates** (`V(c|S_t)`, ally sum, enemy sum, `U(c)`)
-- a per-candidate calculated-value breakdown (`A(c,a)`, `E(c,e)`, `U(c)`, total)
-- raw JSON containing `pick`, full `rankings`, and term-level values.
+- a per-candidate calculated-value breakdown (`A(c,a)`, `E(c,e)`, `U(c)`, total).
