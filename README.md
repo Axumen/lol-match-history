@@ -106,3 +106,62 @@ Practical tip: trust rankings more when `n_enemy` and `n_ally` are reasonably la
    - `n` = use only existing JSON files in `./match_json/`
 4. The script automatically rebuilds `Output.csv` from that folder.
 5. Optionally choose **`Generate BanPriorityOutput.csv now? [y/N]`** to generate metric output in the same run.
+
+
+---
+
+## Champion Select Recommendation Engine (New)
+
+This repo now includes an asymmetric draft pick scorer in `champion_select_metric.py`.
+
+At champion-select time, it computes for each candidate champion `c`:
+
+- `V(c | S_t) = sum ally_synergy + sum enemy_pressure + U(c)`
+- Returns a ranked list and `pick = argmax V(c | S_t)`.
+
+### Required inputs
+
+- `ally_faceup_champions`
+- `enemy_faceup_champions`
+
+`player_role`, `candidate_champions`, `match_count`, `input_file`, and future-uncertainty toggle are now loaded from `api_config.py` defaults.
+
+The engine enforces that all three faceup/candidate collections are provided before scoring.
+
+### Quick usage (step-by-step TUI)
+
+Run:
+
+```bash
+python champion_select_metric.py
+```
+
+The script will ask for required fields one by one:
+- visible allies
+- visible enemies
+
+Everything else is read from `api_config.py`.
+
+### Configure defaults once in `api_config.py`
+
+Set these values so champion-select only needs ally/enemy inputs:
+- `CHAMPION_SELECT_DEFAULT_ROLE`
+- `CHAMPION_SELECT_DEFAULT_CANDIDATES`
+- `CHAMPION_SELECT_DEFAULT_INPUT_FILE` (default `Output.csv`)
+- `CHAMPION_SELECT_DEFAULT_MATCH_COUNT` (default `200`)
+- `CHAMPION_SELECT_DEFAULT_INCLUDE_FUTURE_UNCERTAINTY`
+
+### Optional one-line flags
+
+```bash
+python champion_select_metric.py   --role MID   --context Ahri   --allies "Leona,Vi"   --enemies "Orianna,Lee Sin"   --candidates "Ahri,Syndra,Vex"   --match-count 200
+```
+
+Useful flags:
+- `--input-file Output.csv`
+- `--no-future-uncertainty` to disable `U(c)`.
+
+The script prints:
+- a summary table for **all candidates** (`V(c|S_t)`, ally sum, enemy sum, `U(c)`)
+- a per-candidate calculated-value breakdown (`A(c,a)`, `E(c,e)`, `U(c)`, total)
+- raw JSON containing `pick`, full `rankings`, and term-level values.
