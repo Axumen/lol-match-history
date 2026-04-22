@@ -138,10 +138,10 @@ python champion_select_metric.py
 
 The script will ask for required fields one by one:
 - whether your team is first pick
-- then champions by phase:
-  - if first pick: ally → enemy → ally
-  - if not first pick: enemy → ally → enemy
-- enter `0` at any phase prompt to stop early and continue with results
+- then champions by phase in alternating order:
+  - if first pick: ally → enemy → ally → enemy → ...
+  - if not first pick: enemy → ally → enemy → ally → ...
+- this continues until you explicitly enter `0` at a phase prompt
 
 Everything else is read from `api_config.py`.
 
