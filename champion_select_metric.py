@@ -318,27 +318,20 @@ def _collect_inputs_step_by_step(args: argparse.Namespace) -> argparse.Namespace
     else:
         is_first_pick = _prompt_first_pick()
 
-        if is_first_pick:
-            phase_sequence = [
-                ("ally", "1) Ally champions shown in phase 1"),
-                ("enemy", "2) Enemy champions shown in phase 2"),
-                ("ally", "3) Ally champions shown in phase 3"),
-            ]
-        else:
-            phase_sequence = [
-                ("enemy", "1) Enemy champions shown in phase 1"),
-                ("ally", "2) Ally champions shown in phase 2"),
-                ("enemy", "3) Enemy champions shown in phase 3"),
-            ]
-
-        for team, prompt in phase_sequence:
+        current_team = "ally" if is_first_pick else "enemy"
+        phase_number = 1
+        while True:
+            team_label = "Ally" if current_team == "ally" else "Enemy"
+            prompt = f"{phase_number}) {team_label} champions shown in phase {phase_number}"
             phase_values = _prompt_optional_phase_list(prompt)
             if phase_values is None:
                 break
-            if team == "ally":
+            if current_team == "ally":
                 allies_from_prompts.extend(phase_values)
             else:
                 enemies_from_prompts.extend(phase_values)
+            current_team = "enemy" if current_team == "ally" else "ally"
+            phase_number += 1
 
         allies = args.allies if args.allies is not None else ",".join(allies_from_prompts)
         enemies = args.enemies if args.enemies is not None else ",".join(enemies_from_prompts)

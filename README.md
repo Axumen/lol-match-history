@@ -15,10 +15,14 @@ Per match row:
 - 10 bans
 - Optional `player_ban` (last column)
 
-Analysis window:
-- Take the **last N matches by highest `gameId`**.
-- Keep only matches where the player used the requested champion for performance stats.
-- Use all matches in the N-window for ban-behavior stats.
+Analysis window (two modes):
+- **Mode 1 (default):** take the **last N matches by highest `gameId`**.
+- **Mode 2:** scan matches in descending `gameId` order until the selected champion appears `N` times.
+  - Includes a hard cap (`max_scan_matches`) so scanning stops if the champion is too sparse.
+  - If the cap is hit first, analysis proceeds with however many selected-champion matches were found.
+- Default mode and cap come from `api_config.py`:
+  - `BAN_PRIORITY_DEFAULT_ANALYSIS_MODE`
+  - `BAN_PRIORITY_DEFAULT_MAX_SCAN_MATCHES`
 
 ---
 
@@ -138,10 +142,10 @@ python champion_select_metric.py
 
 The script will ask for required fields one by one:
 - whether your team is first pick
-- then champions by phase:
-  - if first pick: ally → enemy → ally
-  - if not first pick: enemy → ally → enemy
-- enter `0` at any phase prompt to stop early and continue with results
+- then champions by phase in alternating order:
+  - if first pick: ally → enemy → ally → enemy → ...
+  - if not first pick: enemy → ally → enemy → ally → ...
+- this continues until you explicitly enter `0` at a phase prompt
 
 Everything else is read from `api_config.py`.
 

@@ -2,7 +2,12 @@ import csv
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Tuple
+
+from api_config import (
+    BAN_PRIORITY_DEFAULT_ANALYSIS_MODE,
+    BAN_PRIORITY_DEFAULT_MAX_SCAN_MATCHES,
+)
 
 INPUT_FILE = Path("Output.csv")
 OUTPUT_FILE = Path("BanPriorityOutput.csv")
@@ -111,6 +116,32 @@ def _filter_matches_by_champion(
 ) -> List[MatchRow]:
     champion_key = player_champion.strip().lower()
     return [m for m in matches if m.player_champion.strip().lower() == champion_key]
+
+
+def _select_window_until_champion_matches(
+    matches: List[MatchRow],
+    player_champion: str,
+    target_champion_matches: int,
+    max_scan_matches: int,
+) -> Tuple[List[MatchRow], List[MatchRow]]:
+    if target_champion_matches <= 0:
+        return [], []
+    if max_scan_matches <= 0:
+        return [], []
+
+    champion_key = player_champion.strip().lower()
+    ordered = sorted(matches, key=lambda m: _game_id_sort_key(m.game_id), reverse=True)
+
+    recent_window: List[MatchRow] = []
+    selected: List[MatchRow] = []
+    for match in ordered[:max_scan_matches]:
+        recent_window.append(match)
+        if match.player_champion.strip().lower() == champion_key:
+            selected.append(match)
+            if len(selected) >= target_champion_matches:
+                break
+
+    return recent_window, selected
 
 
 def _compute_ban_priority_rows(
@@ -280,15 +311,43 @@ def _read_positive_int(prompt: str, default: int) -> int:
     return value
 
 
+def _read_analysis_mode() -> str:
+    while True:
+        raw = input(
+            "Mode: [1] last N matches window, [2] collect N champion appearances: "
+        ).strip()
+        if raw == "":
+            return BAN_PRIORITY_DEFAULT_ANALYSIS_MODE
+        if raw == "1":
+            return "recent_window"
+        if raw == "2":
+            return "champion_appearances"
+        print("Please choose 1 or 2.")
+
+
 def main() -> None:
     print("=== Ban Priority Metric Calculator ===")
     player_champion = input("Player champion to analyze (exact champion name): ").strip()
     if not player_champion:
         raise ValueError("Champion name is required.")
 
-    match_count = _read_positive_int("How many recent matches to analyze", 50)
+    analysis_mode = _read_analysis_mode()
+    target_count = _read_positive_int(
+        "How many matches to target (window size or champion appearances)", 50
+    )
+    max_scan_matches = BAN_PRIORITY_DEFAULT_MAX_SCAN_MATCHES
+    if analysis_mode == "champion_appearances":
+        max_scan_matches = _read_positive_int(
+            "Max recent matches to scan in champion-appearance mode",
+            BAN_PRIORITY_DEFAULT_MAX_SCAN_MATCHES,
+        )
 
-    generate_ban_priority(player_champion, match_count)
+    generate_ban_priority(
+        player_champion,
+        target_count,
+        analysis_mode=analysis_mode,
+        max_scan_matches=max_scan_matches,
+    )
 
 
 def generate_ban_priority(
@@ -296,30 +355,59 @@ def generate_ban_priority(
     match_count: int = 50,
     input_file: Path = INPUT_FILE,
     output_file: Path = OUTPUT_FILE,
+    analysis_mode: str = BAN_PRIORITY_DEFAULT_ANALYSIS_MODE,
+    max_scan_matches: int = BAN_PRIORITY_DEFAULT_MAX_SCAN_MATCHES,
 ) -> List[Dict[str, float]]:
     if not player_champion or not player_champion.strip():
         raise ValueError("Champion name is required.")
     if match_count <= 0:
         raise ValueError("Match count must be positive.")
+    if max_scan_matches <= 0:
+        raise ValueError("max_scan_matches must be positive.")
+    if analysis_mode not in {"recent_window", "champion_appearances"}:
+        raise ValueError("analysis_mode must be 'recent_window' or 'champion_appearances'.")
 
     matches = _read_matches(input_file)
-    recent_window = _select_recent_window(matches, match_count)
-    selected = _filter_matches_by_champion(recent_window, player_champion)
+    if analysis_mode == "champion_appearances":
+        recent_window, selected = _select_window_until_champion_matches(
+            matches=matches,
+            player_champion=player_champion,
+            target_champion_matches=match_count,
+            max_scan_matches=max_scan_matches,
+        )
+    else:
+        recent_window = _select_recent_window(matches, match_count)
+        selected = _filter_matches_by_champion(recent_window, player_champion)
 
     if not selected:
-        print(
-            f"No rows found in the last {match_count} rows of {input_file} where "
-            f"the player champion is '{player_champion}'."
-        )
+        if analysis_mode == "champion_appearances":
+            print(
+                f"No rows found in the most recent {max_scan_matches} rows of {input_file} where "
+                f"the player champion is '{player_champion}'."
+            )
+        else:
+            print(
+                f"No rows found in the last {match_count} rows of {input_file} where "
+                f"the player champion is '{player_champion}'."
+            )
         return []
 
     rows = _compute_ban_priority_rows(selected, recent_window)
     _write_output(rows, output_file)
 
-    print(
-        f"Analyzed {len(selected)} match(es) for champion '{player_champion}'. "
-        f"Wrote {len(rows)} champion rows to {output_file}."
-    )
+    if analysis_mode == "champion_appearances":
+        hit_target = len(selected) >= match_count
+        status = "reached target" if hit_target else "hit max scan limit before target"
+        print(
+            f"Analyzed {len(selected)} champion match(es) for '{player_champion}' "
+            f"from {len(recent_window)} scanned recent matches ({status}). "
+            f"Wrote {len(rows)} champion rows to {output_file}."
+        )
+    else:
+        print(
+            f"Analyzed {len(selected)} match(es) for champion '{player_champion}'. "
+            f"Wrote {len(rows)} champion rows to {output_file}."
+        )
     _print_preview(rows)
     return rows
 
