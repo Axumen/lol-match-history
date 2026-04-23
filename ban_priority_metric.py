@@ -331,16 +331,15 @@ def main() -> None:
     if not player_champion:
         raise ValueError("Champion name is required.")
 
-    analysis_mode = _read_analysis_mode()
+    analysis_mode = BAN_PRIORITY_DEFAULT_ANALYSIS_MODE
+    max_scan_matches = BAN_PRIORITY_DEFAULT_MAX_SCAN_MATCHES
+    print(
+        "Using ban-priority defaults from api_config.py: "
+        f"analysis_mode={analysis_mode}, max_scan_matches={max_scan_matches}"
+    )
     target_count = _read_positive_int(
         "How many matches to target (window size or champion appearances)", 50
     )
-    max_scan_matches = BAN_PRIORITY_DEFAULT_MAX_SCAN_MATCHES
-    if analysis_mode == "champion_appearances":
-        max_scan_matches = _read_positive_int(
-            "Max recent matches to scan in champion-appearance mode",
-            BAN_PRIORITY_DEFAULT_MAX_SCAN_MATCHES,
-        )
 
     generate_ban_priority(
         player_champion,

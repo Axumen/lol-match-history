@@ -23,6 +23,7 @@ Analysis window (two modes):
 - Default mode and cap come from `api_config.py`:
   - `BAN_PRIORITY_DEFAULT_ANALYSIS_MODE`
   - `BAN_PRIORITY_DEFAULT_MAX_SCAN_MATCHES`
+- `ban_priority_metric.py` uses those config values directly (no interactive prompt for mode/cap).
 
 ---
 
