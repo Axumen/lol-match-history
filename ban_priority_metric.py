@@ -311,6 +311,20 @@ def _read_positive_int(prompt: str, default: int) -> int:
     return value
 
 
+def _read_analysis_mode() -> str:
+    while True:
+        raw = input(
+            "Mode: [1] last N matches window, [2] collect N champion appearances: "
+        ).strip()
+        if raw == "":
+            return BAN_PRIORITY_DEFAULT_ANALYSIS_MODE
+        if raw == "1":
+            return "recent_window"
+        if raw == "2":
+            return "champion_appearances"
+        print("Please choose 1 or 2.")
+
+
 def main() -> None:
     print("=== Ban Priority Metric Calculator ===")
     player_champion = input("Player champion to analyze (exact champion name): ").strip()
