@@ -22,3 +22,10 @@ CHAMPION_SELECT_DEFAULT_CANDIDATES = ["Ahri", "Syndra", "Vex"]
 CHAMPION_SELECT_DEFAULT_INPUT_FILE = Path("Output.csv")
 CHAMPION_SELECT_DEFAULT_MATCH_COUNT = 200
 CHAMPION_SELECT_DEFAULT_INCLUDE_FUTURE_UNCERTAINTY = True
+
+# --- Ban-priority defaults (used by ban_priority_metric.py) ---
+# Modes:
+# - "recent_window": analyze last N matches
+# - "champion_appearances": scan descending matches until champion appears N times
+BAN_PRIORITY_DEFAULT_ANALYSIS_MODE = "recent_window"
+BAN_PRIORITY_DEFAULT_MAX_SCAN_MATCHES = 500
