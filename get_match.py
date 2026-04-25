@@ -233,16 +233,10 @@ def _read_int(prompt_text, default):
 def main():
     print("=== League Match Export ===")
     print(f"Place downloaded match JSON files in: ./{DEFAULT_MATCH_JSON_DIR}")
-    print("You can optionally fetch more matches from API before generating output.")
-
-    fetch_from_api = input("Fetch matches from API first? [y/N]: ").strip().lower() == "y"
-    if fetch_from_api:
-        print("Recommended: Start Index = 0, Number of Matches = 20")
-        start_index = _read_int("Start Index", 0)
-        count = _read_int("Number of Matches", 20)
-    else:
-        start_index = 0
-        count = 0
+    print("Enter match fetch settings (set Number of Matches to 0 to skip API fetching).")
+    print("Recommended: Start Index = 0, Number of Matches = 20")
+    start_index = _read_int("Start Index", 0)
+    count = _read_int("Number of Matches", 20)
 
     print("\n[1/3] Preparing match JSON files...")
     fetch_all_matches(start_index, count, output_dir=DEFAULT_MATCH_JSON_DIR)
